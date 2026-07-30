@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c5e8d9d189e05c4cb42ff9497e48bed, type: 3}
+  m_Name: DiceSettings
+  m_EditorClassIdentifier: Assembly-CSharp::DiceSettings
+  dieSize: 1
+  rollHeight: 2.99
+  rollHeightJitter: 0.2
+  launchSpeed: 8
+  launchSpeedMargin: 1.5
+  launchSpeedMax: 22
+  launchLoftNear: 0.15
+  launchLoftFar: 0.55
+  launchHeightBoostNear: 1
+  maxSimAttempts: 20
+  wallInsetMargin: 0.6
+  maxSimSteps: 600
+  settleSpeedThreshold: 0.05
+  settleAngularThreshold: 0.1
+  settleAlignThreshold: 5
+  dieMass: 0.5
+  dieLinearDrag: 0.5
+  dieAngularDrag: 0.5
+  dieMaxAngularVel: 50
+  dieBounce: {fileID: 0}
+  wallBounce: {fileID: 0}
