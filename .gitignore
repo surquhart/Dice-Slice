@@ -61,3 +61,6 @@ sysinfo.txt
 # Crashlytics generated file
 crashlytics-build.properties
 
+# Per-machine editor preferences (window layouts, AI tool caches, search history)
+/[Uu]serSettings/
+
