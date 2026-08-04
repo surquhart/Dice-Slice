@@ -129,3 +129,47 @@ The `PipRoot` rotation offset is applied **before** the playback coroutine start
 ### Settle detection
 
 A sim step is considered settled only when **both** velocity conditions are met **and** a face is within `settleAlignThreshold` degrees of horizontal (`IsFaceAligned()`). The alignment check prevents the sim from treating a die balanced on an edge as settled.
+
+## Architecture: Player
+
+The player character is a kinematic Rigidbody pawn that moves with WASD and is **visually flat** (2.5D sprite convention) but occupies a 3D footprint for collision.
+
+### Prefab structure (`Assets/Prefabs/Player/Player.prefab`)
+
+| Node | Layer | Components | Purpose |
+|---|---|---|---|
+| Root (Player) | Player (9) | Rigidbody, BoxCollider, PlayerController | Physics root and movement controller |
+| Sprite child | Dice (8) | Cube mesh scale (0.5, 0.01, 1.0), pink material | Flat visual; on Dice layer so DiceCamera overlay renders it above floor |
+
+- **BoxCollider** on root: size `(0.4, 0.1, 0.8)`, center `(0, 0.05, -0.1)`. Bottom flush with floor (`rollHeight`).
+- **Rigidbody**: `isKinematic=true`, `ContinuousSpeculative`, `Interpolate`, `FreezePositionY|FreezeRotation`.
+- `Physics.IgnoreLayerCollision(Player, Dice)` is called in `Awake()` so dice never push the player.
+
+### Movement model (`PlayerController.cs`)
+
+Input is read from `UnityEngine.InputSystem.Keyboard.current` in `Update()` and consumed in `FixedUpdate()` via `MovePosition`.
+
+**Three deceleration modes** (all tunable in Inspector — every field has a `[Tooltip]`):
+
+| Mode | Field | When it fires |
+|---|---|---|
+| Per-axis | `_axisDecelerationX` / `_axisDecelerationZ` | One axis has no input while the other does (mid-turn) |
+| General | `_deceleration` | Both axes have no input (full stop) |
+
+Per-axis deceleration exists specifically to keep 90° turns tight: when the player releases forward while holding strafe, Z velocity bleeds off at `_axisDecelerationZ` while X continues to accelerate. Without it, the player carries forward momentum through the turn, producing a wide arc.
+
+### Wall collision
+
+**Do not rely on physics for wall stopping.** The player's collider shares the exact `rollHeight` Y base with the walls, making physics contacts ambiguous under `FreezePositionY`. Instead, `ClampToRoomBounds()` explicitly clamps each new position so the collider faces cannot exit `DiceManager.GetBoxBounds()`. The formula accounts for `_col.center` offset:
+
+```
+root.x ∈ [room.min.x + halfX - col.center.x,  room.max.x - halfX - col.center.x]
+root.z ∈ [room.min.z + halfZ - col.center.z,  room.max.z - halfZ - col.center.z]
+```
+
+This is called after velocity integration, before `MovePosition`, every `FixedUpdate`.
+
+### Layers
+
+- `Dice` (layer 8) — all dice bodies, pip children, **and the player sprite child** (so the overlay camera renders it on top of room geometry).
+- `Player` (layer 9) — player root only. Configured in `ProjectSettings/TagManager.asset`.

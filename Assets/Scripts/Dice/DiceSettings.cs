@@ -8,8 +8,9 @@ public class DiceSettings : ScriptableObject
     public float dieSize = 1f;
 
     [Header("Roll Plane")]
+    [Tooltip("Y world position of the floor surface where dice come to rest. Drives Room floor placement, die spawn heights, and room bounds.")]
     public float rollHeight = 0.5f;
-    [Tooltip("+-randomisation applied to die spawn height per throw")]
+    [Tooltip("±randomisation applied to die spawn height per throw, so consecutive throws don't arc identically.")]
     public float rollHeightJitter = 0.1f;
 
     [Header("Launch")]
@@ -33,18 +34,26 @@ public class DiceSettings : ScriptableObject
     public float wallInsetMargin = 0.6f;
     [Tooltip("Max physics steps per simulation attempt before giving up")]
     public int   maxSimSteps     = 600;
+    [Tooltip("Max linear speed (units/s) below which a die is considered stopped for settle detection.")]
     public float settleSpeedThreshold   = 0.05f;
+    [Tooltip("Max angular speed (rad/s) below which a die is considered stopped for settle detection.")]
     public float settleAngularThreshold = 0.1f;
-    [Tooltip("Max degrees of tilt from flat for a die to be considered settled (prevents freezing mid-tumble)")]
+    [Tooltip("Max degrees of tilt from flat for a die face to be considered horizontal. Prevents a die balanced on an edge from being marked as settled.")]
     public float settleAlignThreshold   = 5f;
 
     [Header("Die Physics")]
+    [Tooltip("Mass of the die Rigidbody in the simulation scene. Affects momentum when dice collide.")]
     public float dieMass          = 0.5f;
+    [Tooltip("Linear drag in the simulation scene. Higher values bleed off speed faster, producing shorter slides after landing.")]
     public float dieLinearDrag    = 0.5f;
+    [Tooltip("Angular drag in the simulation scene. Higher values reduce spin faster, producing fewer rolling rotations after landing.")]
     public float dieAngularDrag   = 0.5f;
+    [Tooltip("Hard cap on the die's angular speed in the simulation. Prevents extreme spinning that can skip settle detection.")]
     public float dieMaxAngularVel = 50f;
 
     [Header("Physics Materials")]
+    [Tooltip("PhysicsMaterial used on the die collider — controls bounciness and friction against the floor and other dice.")]
     public PhysicsMaterial dieBounce;
+    [Tooltip("PhysicsMaterial used on wall and floor colliders in the simulation — controls how much the die bounces off walls.")]
     public PhysicsMaterial wallBounce;
 }
