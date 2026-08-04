@@ -5,6 +5,8 @@ public class DiceManager : MonoBehaviour
 {
     public static DiceManager Instance { get; private set; }
 
+    public static event System.Action<int> OnDieRolled;
+
     [SerializeField] DiceSettings _settings;
     [SerializeField] GameObject   _diePrefab;
 
@@ -37,6 +39,7 @@ public class DiceManager : MonoBehaviour
         die.Initialize(_settings, ++_rollOrderCounter);
         _dice.Add(die);
         die.Roll(worldTarget, forcedValue);
+        OnDieRolled?.Invoke(die.RolledValue);
         return die;
     }
 

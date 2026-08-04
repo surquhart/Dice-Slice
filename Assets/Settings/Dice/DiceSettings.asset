@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5c5e8d9d189e05c4cb42ff9497e48bed, type: 3}
   m_Name: DiceSettings
   m_EditorClassIdentifier: Assembly-CSharp::DiceSettings
-  dieSize: 1
+  dieSize: 0.66
   rollHeight: 2.99
   rollHeightJitter: 0.2
   launchSpeed: 8

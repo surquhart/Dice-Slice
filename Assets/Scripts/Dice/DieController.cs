@@ -10,7 +10,8 @@ public class DieController : MonoBehaviour
     [Tooltip("Fired when the die settles; argument is the rolled value (1-6).")]
     public UnityEvent<int> OnRollComplete;
 
-    public int  RolledValue { get; private set; }
+    [SerializeField] int _rolledValue;
+    public int  RolledValue => _rolledValue;
     public int  RollOrder   { get; private set; }
     public bool IsRolling   { get; private set; }
 
@@ -115,7 +116,7 @@ public class DieController : MonoBehaviour
         SimRotations = simRotations;
         PlaybackStep = 0;
 
-        RolledValue = desired;
+        _rolledValue = desired;
         IsRolling   = true;
 
         StartCoroutine(PlaybackTrajectory(simPositions, simRotations, offX, offZ));
