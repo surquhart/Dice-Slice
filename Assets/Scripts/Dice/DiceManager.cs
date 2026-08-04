@@ -10,7 +10,7 @@ public class DiceManager : MonoBehaviour
 
     private readonly List<DieController> _dice           = new();
     private int                          _rollOrderCounter;
-    private RollBoundsBox                _boundsBox;
+    private Room                         _room;
 
     void Awake()
     {
@@ -20,7 +20,7 @@ public class DiceManager : MonoBehaviour
 
     void Start()
     {
-        _boundsBox = FindFirstObjectByType<RollBoundsBox>();
+        _room = FindAnyObjectByType<Room>();
     }
 
     public DieController RollDie(Vector3 worldTarget, int forcedValue = -1)
@@ -42,9 +42,9 @@ public class DiceManager : MonoBehaviour
 
     public void UnregisterDie(DieController die) => _dice.Remove(die);
 
-    public Bounds GetBoxBounds() => _boundsBox != null
-        ? _boundsBox.GetBounds()
-        : new Bounds(Vector3.zero, new Vector3(20f, 10f, 20f));
+    public Bounds GetBoxBounds() => _room != null
+        ? _room.GetBounds()
+        : new Bounds(Vector3.zero, new Vector3(15f, 10f, 10f));
 
     public IReadOnlyList<DieController> GetDiceInRollOrder() => _dice.AsReadOnly();
 

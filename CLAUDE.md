@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This project has UnityMCP configured, so you can interact with the Unity Editor directly via tools (`mcp__UnityMCP__*`). Always:
 1. Use `read_console` after any script change to check for compilation errors before proceeding.
-2. Poll `editor_state` resource (`mcpforunity://editor_state`) to confirm `isCompiling` is false before using new types.
+2. Poll `editor_state` resource (`mcpforunity://editor/state`) to confirm `isCompiling` is false before using new types.
 3. Use `manage_scene` to inspect scene state, `manage_gameobject` / `manage_components` to inspect/modify GameObjects.
 
 ## Running & Testing
@@ -45,13 +45,71 @@ LevelClickHandler (mouse click at roll plane)
 | File | Role |
 |---|---|
 | `Assets/Scripts/Dice/DiceSettings.cs` | `ScriptableObject` — single source of truth for all tuning (launch speed, physics, settle thresholds). Asset lives at `Assets/Settings/Dice/DiceSettings.asset`. |
-| `DiceManager.cs` | Singleton orchestrator. Tracks `List<DieController>` in roll order; supplies obstacle data to the simulator. |
-| `DieController.cs` | Per-die behaviour. Holds the recorded trajectory arrays (`WorldPositions[]`, `SimRotations[]`). Rigidbody is always kinematic. |
-| `DieSimulator.cs` | Static class. Owns a persistent `LocalPhysicsMode.Physics3D` scene (`__DiceSimulation`). Runs up to `maxSimAttempts` random attempts (Pass 1), then re-runs the winner with all other dice as collider proxies (Pass 2). |
+| `Assets/Scripts/Room/Room.cs` | `MonoBehaviour` on the Room prefab root. Stores `_width`, `_depth`, `_wallHeight`. `GetBounds()` returns the play-area `Bounds` consumed by `DiceManager` and `DieSimulator`. Changing any dimension field in the Inspector immediately reshapes all child geometry via `OnValidate`. |
+| `DiceManager.cs` | Singleton orchestrator. Tracks `List<DieController>` in roll order; supplies obstacle data to the simulator. Finds the active `Room` in `Start()` to provide bounds. |
+| `DieController.cs` | Per-die behaviour. Holds the recorded trajectory arrays (`WorldPositions[]`, `SimRotations[]`). Rigidbody is always kinematic. When `DieSimulator.Run()` returns `success=false`, `sim.positions` is null — code uses `?? System.Array.Empty<Vector3>()` to avoid a NullReferenceException. |
+| `LevelClickHandler.cs` | Converts mouse clicks to world targets. Uses `Physics.Raycast` (not `Plane.Raycast`) against all layers except Dice so wall clicks project correctly to the roll plane. Clamps the target using `Mathf.Max(halfDiag, wallInsetMargin)` — this is critical: when `dieSize` is small, `halfDiag < wallInsetMargin`, and clamping only by `halfDiag` would produce targets that always fail the sim's in-bounds check. |
+| `DieSimulator.cs` | Static class. Owns a persistent `LocalPhysicsMode.Physics3D` scene (`__DiceSimulation`). Runs up to `maxSimAttempts` random attempts (Pass 1), then re-runs the winner with all other dice as collider proxies (Pass 2). `SimResult.positions` is **null** when all attempts fail — callers must null-check. |
 | `DieFaceMapper.cs` | Static class. Encodes the Western die convention (+Y=1, -Y=6, +Z=2, -Z=5, +X=3, -X=4). Computes a `PipRoot` rotation offset so the die always shows the desired value regardless of where the sim landed. |
 | `DiePipBuilder.cs` | Procedurally builds pip sphere geometry under a `PipRoot` child. Pips are visual only — `SphereCollider` is destroyed immediately after creation. |
-| `RollBoundsBox.cs` | `[ExecuteAlways]`. Auto-fits wall colliders to camera frustum by raycasting viewport corners onto the roll plane. Adds `FrontWallGate` to the front wall automatically. |
-| `FrontWallGate.cs` | Keeps the front wall collider disabled while any die is crossing it (trigger-counted), then enables it once all dice are inside. |
+| `FrontWallGate.cs` | One-way passthrough for walls or ceiling. Solid collider starts disabled; a trigger zone opens it while dice are crossing, then closes once they're through. Configure `_outwardDir` to point away from the room interior: `(0,0,-1)` for front wall, `(0,1,0)` for ceiling. Trigger size is computed in world space via `lossyScale`, so it works correctly on scaled Cubes. |
+
+## Architecture: Dice Rendering
+
+Dice must always appear on top of room geometry (walls, floor) to stay readable, while still self-occluding correctly (back-face pips hidden behind the die body). This is achieved with **URP camera stacking**, not a RenderObjects pass.
+
+### Setup
+
+- **Main Camera** — culling mask excludes the `Dice` layer (layer 8, `0xFFFFFEFF`). Renders everything except dice.
+- **DiceCamera** — child of Main Camera. Type: Overlay. `clearDepth = true`. Culling mask: Dice layer only (`0x100`).
+
+`clearDepth = true` on the overlay camera discards the main camera's depth buffer before the overlay renders. Dice then draw into a fresh depth buffer, so they always composite on top of scene geometry. Self-occlusion (pip vs die body) is handled correctly by the fresh depth buffer without any special sorting tricks.
+
+### Why not RenderObjects?
+
+A `RenderObjects` ScriptableRendererFeature with `ZTest Always` was tried first. It caused two visible artifacts:
+1. Back-face pips rendered in front of the die body (URP opaque pass sorts front-to-back; farther fragments win with `ZTest Always`).
+2. Overlapping dice/wall areas appeared darker (ambient lighting accumulated twice).
+
+Camera stacking avoids both issues. Do not revert to RenderObjects.
+
+### Die layer assignment
+
+`DieController.Initialize()` calls `SetLayerRecursively()` to put the die body and all pip children on the Dice layer. This must happen before the die is visible.
+
+## Architecture: Rooms
+
+Rooms are self-contained Prefabs (`Assets/Prefabs/Room/Room.prefab`). Each room contains:
+
+| Child | Visible | Purpose |
+|---|---|---|
+| `Floor` | Yes | Sandy brown cube, top surface at `rollHeight` |
+| `Wall_Back` | Yes | Dirt brown cube at far Z edge |
+| `Wall_Left` / `Wall_Right` | Yes | Dirt brown cubes at side X edges |
+| `Wall_Front` | No | Invisible cube at near Z edge; has `FrontWallGate` (`_outwardDir=(0,0,-1)`) |
+| `Ceiling` | No | Invisible cube above room; has `FrontWallGate` (`_outwardDir=(0,1,0)`) |
+
+Default room size: **15 × 10 units** (width × depth), walls 10 units tall. Controlled by `Room._width`, `Room._depth`, `Room._wallHeight`.
+
+### Geometry is driven by Room.cs
+
+`Room.ApplyDimensions()` is called from both `Awake()` (play mode) and `OnValidate()` (editor). It repositions and rescales all six child cubes to match `_width`, `_depth`, `_wallHeight`, and `DiceSettings.rollHeight`. Changing any of those fields in the Inspector immediately reshapes the room. The child transform formulas are:
+
+```
+floorCenter  = (0,  rollHeight - 0.05,         0)   scale = (width, 0.1,        depth)
+wallCenterY  = rollHeight + wallHeight / 2
+Wall_Back    = (0,  wallCenterY,      depth/2)       scale = (width, wallHeight, 0.1)
+Wall_Front   = (0,  wallCenterY,     -depth/2)       scale = (width, wallHeight, 0.1)
+Wall_Left    = (-width/2, wallCenterY, 0)             scale = (0.1,  wallHeight, depth)
+Wall_Right   = ( width/2, wallCenterY, 0)             scale = (0.1,  wallHeight, depth)
+Ceiling      = (0,  rollHeight + wallHeight,   0)    scale = (width, 0.1,        depth)
+```
+
+**Reinstantiation for procedural rooms**: instantiate a new `Room.prefab`, position it, and wire its `DoorSlot` children (future) to a `RoomManager` singleton. `DiceManager` finds the active `Room` automatically via `FindAnyObjectByType` on `Start()`. Only one Room should be active at a time.
+
+**Materials**: `Assets/Materials/Room/FloorMaterial.mat` (sandy brown) and `WallMaterial.mat` (dirt brown). Replace with sprite-based materials as art is produced.
+
+**Camera**: Position `(0, 12, -2)`, Rotation `(75, 0, 0)`, FOV 60°. This is a tuning starting point — the bottom frustum edge is designed to align with the near floor edge. Adjust `transform.position` and `fieldOfView` without touching `DiceSettings.rollHeight`; the dice system adapts automatically because `LevelClickHandler` raycasts against the roll plane and the sim uses `Room.GetBounds()`.
 
 ### Two-pass simulation detail
 

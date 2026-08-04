@@ -39,6 +39,18 @@ public class DieController : MonoBehaviour
         transform.localScale = Vector3.one * (_settings ? _settings.dieSize : 1f);
         _pipBuilder?.Build();
         _pipRoot = transform.Find("PipRoot");
+
+        // Move die and all pip children onto the Dice layer so the overlay
+        // camera can render them above all scene geometry.
+        int diceLayer = LayerMask.NameToLayer("Dice");
+        if (diceLayer >= 0) SetLayerRecursively(gameObject, diceLayer);
+    }
+
+    static void SetLayerRecursively(GameObject go, int layer)
+    {
+        go.layer = layer;
+        for (int i = 0; i < go.transform.childCount; i++)
+            SetLayerRecursively(go.transform.GetChild(i).gameObject, layer);
     }
 
     void Start()
@@ -92,19 +104,21 @@ public class DieController : MonoBehaviour
         // this die as a kinematic obstacle while it's still mid-playback.
         float offX = sim.startPos.x;
         float offZ = sim.startPos.z;
-        WorldPositions = new Vector3[sim.positions.Length];
-        for (int k = 0; k < sim.positions.Length; k++)
+        Vector3[]    simPositions = sim.positions ?? System.Array.Empty<Vector3>();
+        Quaternion[] simRotations = sim.rotations ?? System.Array.Empty<Quaternion>();
+        WorldPositions = new Vector3[simPositions.Length];
+        for (int k = 0; k < simPositions.Length; k++)
             WorldPositions[k] = new Vector3(
-                sim.positions[k].x + offX,
-                sim.positions[k].y,
-                sim.positions[k].z + offZ);
-        SimRotations = sim.rotations;
+                simPositions[k].x + offX,
+                simPositions[k].y,
+                simPositions[k].z + offZ);
+        SimRotations = simRotations;
         PlaybackStep = 0;
 
         RolledValue = desired;
         IsRolling   = true;
 
-        StartCoroutine(PlaybackTrajectory(sim.positions, sim.rotations, offX, offZ));
+        StartCoroutine(PlaybackTrajectory(simPositions, simRotations, offX, offZ));
     }
 
     private IEnumerator PlaybackTrajectory(Vector3[] positions, Quaternion[] rotations,
