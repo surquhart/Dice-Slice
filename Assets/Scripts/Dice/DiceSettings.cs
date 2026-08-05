@@ -56,4 +56,8 @@ public class DiceSettings : ScriptableObject
     public PhysicsMaterial dieBounce;
     [Tooltip("PhysicsMaterial used on wall and floor colliders in the simulation — controls how much the die bounces off walls.")]
     public PhysicsMaterial wallBounce;
+
+    [Header("Die Removal")]
+    [Tooltip("Seconds the die stays visible (coloured red) after being removed from play. 0 = instant.")]
+    public float dieRemovalDelay = 0.2f;
 }

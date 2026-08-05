@@ -83,6 +83,46 @@ public class DiceManager : MonoBehaviour
         return result.ToArray();
     }
 
+    // Returns the active die with the lowest RollOrder (spawned earliest).
+    // tieBreakPos breaks ties among dice with the same order by nearest XZ distance.
+    public DieController GetOldestActiveDie(Vector3 tieBreakPos)
+    {
+        DieController result  = null;
+        int   bestOrder = int.MaxValue;
+        float bestDist  = float.MaxValue;
+        foreach (var d in _dice)
+        {
+            if (d == null || d.IsBeingRemoved) continue;
+            float dist = XZDist(d.transform.position, tieBreakPos);
+            if (d.RollOrder < bestOrder || (d.RollOrder == bestOrder && dist < bestDist))
+            {
+                result = d; bestOrder = d.RollOrder; bestDist = dist;
+            }
+        }
+        return result;
+    }
+
+    // Returns the active die with the highest RollOrder (spawned most recently).
+    public DieController GetNewestActiveDie(Vector3 tieBreakPos)
+    {
+        DieController result  = null;
+        int   bestOrder = int.MinValue;
+        float bestDist  = float.MaxValue;
+        foreach (var d in _dice)
+        {
+            if (d == null || d.IsBeingRemoved) continue;
+            float dist = XZDist(d.transform.position, tieBreakPos);
+            if (d.RollOrder > bestOrder || (d.RollOrder == bestOrder && dist < bestDist))
+            {
+                result = d; bestOrder = d.RollOrder; bestDist = dist;
+            }
+        }
+        return result;
+    }
+
+    static float XZDist(Vector3 a, Vector3 b) =>
+        Mathf.Sqrt((a.x - b.x) * (a.x - b.x) + (a.z - b.z) * (a.z - b.z));
+
     public void ClearAllDice()
     {
         foreach (var d in _dice)

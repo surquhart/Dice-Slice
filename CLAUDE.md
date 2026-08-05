@@ -173,3 +173,28 @@ This is called after velocity integration, before `MovePosition`, every `FixedUp
 
 - `Dice` (layer 8) — all dice bodies, pip children, **and the player sprite child** (so the overlay camera renders it on top of room geometry).
 - `Player` (layer 9) — player root only. Configured in `ProjectSettings/TagManager.asset`.
+
+### Dash system (`PlayerController.cs`, `DashFeedback.cs`, `CameraShake.cs`)
+
+The dash is a state machine with four phases driven by coroutine timing and `FixedUpdate` position.
+
+**Phases**: `None → Delaying → Moving → PostDash → None`
+
+- **Delaying** (`_dashDelay`): player frozen, no movement. Feedback and die removal happen at the transition into Moving.
+- **Moving** (`_dashDuration`): coroutine lerps `_rb.MovePosition()` toward the target each `WaitForFixedUpdate`. **Critical**: `FixedUpdate` must `return` immediately during all non-None phases without calling `_rb.MovePosition()`. The execution order is FixedUpdate → physics → WaitForFixedUpdate. If FixedUpdate calls MovePosition, physics resolves it first, and the coroutine's call queued after physics gets overridden by the *next* FixedUpdate. The player would never move.
+- **PostDash** (`_postDashDelay`): normal movement locked, but another dash can be initiated. This allows dash chaining.
+- `IsDashing` is true only during Delaying + Moving (not PostDash).
+
+**Dash target**: `DiceManager.GetOldestActiveDie()` — lowest `RollOrder`, XZ distance tie-break.
+
+**Right-click removes die**: `LevelClickHandler` calls `DiceManager.GetNewestActiveDie()?.TriggerRemoval()`. The die turns red for `DiceSettings.dieRemovalDelay` seconds then is destroyed. It is immediately unregistered from `DiceManager` so it cannot be dashed to.
+
+**Chaining**: if a new dash starts within `_chainWindow` seconds of the last one, `_lastDashTotalDamage` is added to the new dash's damage (fully compounding). All active `DashFeedback` objects have their lifetimes reset on a chain.
+
+**Damage formula**: `damage = target.RolledValue + chainBonus`
+
+**Visual feedback** (`DashFeedback.cs`): spawned per dash. Contains a `LineRenderer` (using `Sprites/Default` shader for alpha support) and a world-space `TextMeshPro` lying flat on the floor. Both sit on the `Dice` layer so the overlay camera renders them above the floor. Number rotation is `Quaternion.Euler(90, 0, 0)` — tested to be correct for this camera angle.
+
+**Scaling** (multiplicative): `value = base × (1 + damage × multiplier)`, capped per element.
+
+**Screen shake** (`CameraShake.cs`): attached to Main Camera. Applies a decaying random XZ offset only (no Y). Scaled with damage, capped.

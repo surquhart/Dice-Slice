@@ -11,9 +11,10 @@ public class DieController : MonoBehaviour
     public UnityEvent<int> OnRollComplete;
 
     [SerializeField] int _rolledValue;
-    public int  RolledValue => _rolledValue;
-    public int  RollOrder   { get; private set; }
-    public bool IsRolling   { get; private set; }
+    public int  RolledValue    => _rolledValue;
+    public int  RollOrder      { get; private set; }
+    public bool IsRolling      { get; private set; }
+    public bool IsBeingRemoved { get; private set; }
 
     // Exposed so DiceManager can provide this die's trajectory to DieSimulator
     // when a later die rolls while this one is still mid-playback.
@@ -137,6 +138,28 @@ public class DieController : MonoBehaviour
 
         IsRolling = false;
         OnRollComplete?.Invoke(RolledValue);
+    }
+
+    // Removes the die from the active list immediately, then visually destroys it
+    // after dieRemovalDelay so exit animations/VFX can play without affecting gameplay.
+    public void TriggerRemoval()
+    {
+        if (IsBeingRemoved) return;
+        IsBeingRemoved = true;
+        DiceManager.Instance?.UnregisterDie(this);
+        StartCoroutine(RemovalSequence());
+    }
+
+    IEnumerator RemovalSequence()
+    {
+        var mpb = new MaterialPropertyBlock();
+        mpb.SetColor("_BaseColor", Color.red);
+        foreach (var r in GetComponentsInChildren<Renderer>())
+            r.SetPropertyBlock(mpb);
+
+        float delay = _settings ? _settings.dieRemovalDelay : 0.2f;
+        if (delay > 0f) yield return new WaitForSeconds(delay);
+        Destroy(gameObject);
     }
 
     void OnDestroy() => DiceManager.Instance?.UnregisterDie(this);

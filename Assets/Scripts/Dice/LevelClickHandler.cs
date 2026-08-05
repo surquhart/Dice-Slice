@@ -9,7 +9,18 @@ public class LevelClickHandler : MonoBehaviour
 
     void Update()
     {
-        if (Mouse.current == null || !Mouse.current.leftButton.wasPressedThisFrame) return;
+        if (Mouse.current == null) return;
+
+        // Right-click: remove the most-recently spawned die (nearest if tied).
+        if (Mouse.current.rightButton.wasPressedThisFrame && DiceManager.Instance != null)
+        {
+            var playerPos = PlayerController.Instance != null
+                ? PlayerController.Instance.transform.position
+                : Vector3.zero;
+            DiceManager.Instance.GetNewestActiveDie(playerPos)?.TriggerRemoval();
+        }
+
+        if (!Mouse.current.leftButton.wasPressedThisFrame) return;
 
         Camera cam = Camera.main;
         if (cam == null || DiceManager.Instance == null) return;
