@@ -8,7 +8,12 @@ public class DiceManager : MonoBehaviour
     public static event System.Action<int> OnDieRolled;
 
     [SerializeField] DiceSettings _settings;
-    [SerializeField] GameObject   _diePrefab;
+
+    [Header("Die Prefabs (keys 1–0)")]
+    [Tooltip("Slot 0 = key 1, Slot 1 = key 2, …, Slot 9 = key 0. Leave a slot empty to skip that key.")]
+    [SerializeField] GameObject[] _diePrefabs = new GameObject[10];
+
+    private int _activeDieIndex = 0;
 
     private readonly List<DieController> _dice           = new();
     private int                          _rollOrderCounter;
@@ -25,15 +30,42 @@ public class DiceManager : MonoBehaviour
         _room = FindAnyObjectByType<Room>();
     }
 
+    void Update()
+    {
+        var kb = UnityEngine.InputSystem.Keyboard.current;
+        if (kb == null) return;
+        if      (kb.digit1Key.wasPressedThisFrame) TrySetActive(0);
+        else if (kb.digit2Key.wasPressedThisFrame) TrySetActive(1);
+        else if (kb.digit3Key.wasPressedThisFrame) TrySetActive(2);
+        else if (kb.digit4Key.wasPressedThisFrame) TrySetActive(3);
+        else if (kb.digit5Key.wasPressedThisFrame) TrySetActive(4);
+        else if (kb.digit6Key.wasPressedThisFrame) TrySetActive(5);
+        else if (kb.digit7Key.wasPressedThisFrame) TrySetActive(6);
+        else if (kb.digit8Key.wasPressedThisFrame) TrySetActive(7);
+        else if (kb.digit9Key.wasPressedThisFrame) TrySetActive(8);
+        else if (kb.digit0Key.wasPressedThisFrame) TrySetActive(9);
+    }
+
+    // Only switches if the target slot has a prefab assigned.
+    void TrySetActive(int index)
+    {
+        if (index < _diePrefabs.Length && _diePrefabs[index] != null)
+            _activeDieIndex = index;
+    }
+
     public DieController RollDie(Vector3 worldTarget, int forcedValue = -1)
     {
-        if (_diePrefab == null)
+        var prefab = (_diePrefabs != null && _activeDieIndex < _diePrefabs.Length)
+            ? _diePrefabs[_activeDieIndex]
+            : null;
+
+        if (prefab == null)
         {
-            Debug.LogError("[DiceManager] _diePrefab is not assigned.");
+            Debug.LogError($"[DiceManager] No prefab assigned to slot {_activeDieIndex} (key {(_activeDieIndex + 1) % 10}).");
             return null;
         }
 
-        var die = Instantiate(_diePrefab).GetComponent<DieController>();
+        var die = Instantiate(prefab).GetComponent<DieController>();
         if (die == null) { Destroy(die); return null; }
 
         die.Initialize(_settings, ++_rollOrderCounter);
@@ -84,6 +116,7 @@ public class DiceManager : MonoBehaviour
     }
 
     // Returns the active die with the lowest RollOrder (spawned earliest).
+    // Only settled dice are eligible — a rolling die's displayed value is not yet known.
     // tieBreakPos breaks ties among dice with the same order by nearest XZ distance.
     public DieController GetOldestActiveDie(Vector3 tieBreakPos)
     {
@@ -92,7 +125,7 @@ public class DiceManager : MonoBehaviour
         float bestDist  = float.MaxValue;
         foreach (var d in _dice)
         {
-            if (d == null || d.IsBeingRemoved) continue;
+            if (d == null || d.IsBeingRemoved || d.IsRolling) continue;
             float dist = XZDist(d.transform.position, tieBreakPos);
             if (d.RollOrder < bestOrder || (d.RollOrder == bestOrder && dist < bestDist))
             {

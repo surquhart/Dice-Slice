@@ -26,6 +26,7 @@ public class DashFeedback : MonoBehaviour
         public float numberLifetime;
         public float numberFadeDuration;
         public float numberLinePosition; // 0 = dash start, 1 = die position
+        public float numberChainAlphaReduction; // opacity lost each time lifetime is reset
 
         // Interrupt
         public float interruptShrink;
@@ -37,6 +38,7 @@ public class DashFeedback : MonoBehaviour
     Color         _lineColor;
     float         _lineSpawnTime;
     float         _numberSpawnTime;
+    float         _currentMaxAlpha = 1f; // reduced each chain reset
     bool          _interrupted;
     Config        _cfg;
 
@@ -62,13 +64,15 @@ public class DashFeedback : MonoBehaviour
         _numberSpawnTime = Time.time;
     }
 
-    // Resets both lifetimes to their full durations (called when a chain dash occurs).
+    // Resets both lifetimes and reduces the number's maximum opacity, so older
+    // numbers in a chain are visually distinguishable from the most recent one.
     public void ResetLifetime()
     {
-        _lineSpawnTime   = Time.time;
-        _numberSpawnTime = Time.time;
+        _lineSpawnTime    = Time.time;
+        _numberSpawnTime  = Time.time;
+        _currentMaxAlpha  = Mathf.Max(0f, _currentMaxAlpha - _cfg.numberChainAlphaReduction);
         SetLineAlpha(1f);
-        if (_tmp != null) _tmp.alpha = 1f;
+        if (_tmp != null) _tmp.alpha = _currentMaxAlpha;
     }
 
     // Cuts the line at interruptPos and applies interrupt visual styling.
@@ -121,7 +125,9 @@ public class DashFeedback : MonoBehaviour
         float total = _cfg.numberLifetime + _cfg.numberFadeDuration;
         if (age >= total) { Destroy(_tmp.gameObject); _tmp = null; return true; }
         if (age >= _cfg.numberLifetime)
-            _tmp.alpha = 1f - (age - _cfg.numberLifetime) / _cfg.numberFadeDuration;
+            _tmp.alpha = _currentMaxAlpha * (1f - (age - _cfg.numberLifetime) / _cfg.numberFadeDuration);
+        else
+            _tmp.alpha = _currentMaxAlpha;
         return false;
     }
 

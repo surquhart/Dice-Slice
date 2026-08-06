@@ -190,3 +190,33 @@ MonoBehaviour:
   _deceleration: 15
   _axisDecelerationX: 25
   _axisDecelerationZ: 25
+  _dashKey: 1
+  _dashDelay: 0.05
+  _dashDuration: 0.1
+  _postDashDelay: 0.1
+  _retainVelocity: 0
+  _dashEndVelocity: 3
+  _chainWindow: 1
+  _lineColor: {r: 0.55, g: 0.55, b: 0.55, a: 1}
+  _interruptLineColor: {r: 0.78, g: 0.78, b: 0.78, a: 1}
+  _lineBaseWidth: 0.1
+  _lineDamageWidthMult: 0.01
+  _lineWidthCap: 0.5
+  _lineLifetime: 0.8
+  _lineFadeDuration: 0.5
+  _numberColor: {r: 0.3, g: 0.3, b: 0.3, a: 1}
+  _interruptNumberColor: {r: 0.62, g: 0.62, b: 0.62, a: 1}
+  _numberBaseSize: 0.3
+  _numberDamageScaleMult: 0.1
+  _numberSizeCap: 2.5
+  _numberLinePosition: 0.5
+  _numberLifetime: 1
+  _numberFadeDuration: 0.3
+  _numberChainAlphaReduction: 0.2
+  _shakeBaseX: 0.05
+  _shakeBaseZ: 0.05
+  _shakeDamageMultX: 0.1
+  _shakeDamageMultZ: 0.1
+  _shakeCapX: 0.3
+  _shakeCapZ: 0.3
+  _interruptShrink: 0.5

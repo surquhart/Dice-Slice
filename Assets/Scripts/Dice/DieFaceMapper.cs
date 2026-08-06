@@ -1,6 +1,6 @@
 using UnityEngine;
 
-// Maps die face normals to pip values and computes pip-root remapping.
+// Maps die face normals to pip values and computes face-correction rotations.
 public static class DieFaceMapper
 {
     // Standard Western die in local space: +Y=1, -Y=6, +Z=2, -Z=5, +X=3, -X=4
@@ -35,8 +35,8 @@ public static class DieFaceMapper
         return Vector3.up;
     }
 
-    // Returns the localRotation to apply to PipRoot so that desiredValue ends up
-    // face-up after the die reaches the simulated final rotation.
+    // Returns Q such that (finalRotation * Q) places desiredValue face-up.
+    // Apply as: transform.rotation = sim.finalRotation * PipRemapRotation(simTop, desired)
     public static Quaternion PipRemapRotation(int simulatedTopValue, int desiredValue)
     {
         if (simulatedTopValue == desiredValue) return Quaternion.identity;

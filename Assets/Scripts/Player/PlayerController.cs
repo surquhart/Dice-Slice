@@ -97,6 +97,9 @@ public class PlayerController : MonoBehaviour
     [Tooltip("Seconds over which the number fades out after its lifetime expires.")]
     [SerializeField] float _numberFadeDuration   = 0.3f;
 
+    [Tooltip("How much maximum opacity is lost each time a number's lifetime is reset during a chain. 0 = no change; 0.2 = each chain step fades the number by another 20%.")]
+    [SerializeField] float _numberChainAlphaReduction = 0.2f;
+
     // ── Dash — Screen Shake ────────────────────────────────────────────────────
     [Header("Dash — Screen Shake")]
     [Tooltip("Base camera shake magnitude on the X axis.")]
@@ -365,9 +368,10 @@ public class PlayerController : MonoBehaviour
         numberBaseSize        = _numberBaseSize,
         numberDamageScaleMult = _numberDamageScaleMult,
         numberSizeCap         = _numberSizeCap,
-        numberLifetime        = _numberLifetime,
-        numberFadeDuration    = _numberFadeDuration,
-        numberLinePosition    = _numberLinePosition,
+        numberLifetime             = _numberLifetime,
+        numberFadeDuration         = _numberFadeDuration,
+        numberLinePosition         = _numberLinePosition,
+        numberChainAlphaReduction  = _numberChainAlphaReduction,
 
         interruptShrink = _interruptShrink,
     };

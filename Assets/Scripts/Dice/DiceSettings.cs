@@ -60,4 +60,22 @@ public class DiceSettings : ScriptableObject
     [Header("Die Removal")]
     [Tooltip("Seconds the die stays visible (coloured red) after being removed from play. 0 = instant.")]
     public float dieRemovalDelay = 0.2f;
+
+    [Header("Rolling Transparency")]
+    [Tooltip("Opacity of a die while it is mid-flight (0 = invisible, 1 = fully opaque). Linearly fades to full opacity as the die nears its landing position.")]
+    public float rollingStartOpacity = 0.25f;
+
+    [Header("Playback Speed")]
+    [Tooltip("Trajectory playback speed multiplier. 1 = real-time physics speed. 2 = advances two trajectory positions per fixed frame. Values below 1 slow the die down.")]
+    public float playbackSpeedMultiplier = 1f;
+
+    [Header("Settle VFX")]
+    [Tooltip("How many trajectory positions before the final rest position at which the settle ring VFX is triggered. Tune this so the ring finishes expanding as the die arrives.")]
+    public int   dustCloudEarlyFrames    = 5;
+    [Tooltip("World-unit radius the dust ring grows to when a die settles.")]
+    public float dustCloudMaxRadius      = 1f;
+    [Tooltip("Seconds for the dust ring to expand from zero to its full radius.")]
+    public float dustCloudExpandDuration = 0.3f;
+    [Tooltip("Seconds for the dust ring to fade out after it finishes expanding.")]
+    public float dustCloudFadeDuration   = 0.2f;
 }

@@ -620,7 +620,17 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DiceManager
   _settings: {fileID: 11400000, guid: 11e74cd948d31314f8a37a74811abb98, type: 2}
-  _diePrefab: {fileID: 1200883942946731799, guid: 4c0b0991b30d68849a56d4e09eabee33, type: 3}
+  _diePrefabs:
+  - {fileID: 1200883942946731799, guid: 4c0b0991b30d68849a56d4e09eabee33, type: 3}
+  - {fileID: 1200883942946731799, guid: ecb8ad1063ec8014b8a4f47c44e43869, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
 --- !u!4 &1616269454
 Transform:
   m_ObjectHideFlags: 0

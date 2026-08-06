@@ -15,7 +15,7 @@ GameObject:
   - component: {fileID: 2578916629098798206}
   - component: {fileID: 587428382516650390}
   m_Layer: 0
-  m_Name: Die
+  m_Name: Die_d6_111456
   m_TagString: Die
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -43,7 +43,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1200883942946731799}
-  m_Mesh: {fileID: 5452942093625781371, guid: 5b5cb01ea46178046baae9687b8dedd1, type: 3}
+  m_Mesh: {fileID: 5452942093625781371, guid: 6272d99cfe9c7ad4a9645f5d7449c6a2, type: 3}
 --- !u!65 &6541535632777943221
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -90,7 +90,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 3d4352f9661329f43be1e58c1f20d657, type: 2}
+  - {fileID: 2100000, guid: 25ef5b648069cb84a977ec425dbf6f9f, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -162,13 +162,13 @@ MonoBehaviour:
     value: 6
     weight: 1
   - normal: {x: 0, y: 0, z: 1}
-    value: 2
+    value: 1
     weight: 1
   - normal: {x: 0, y: 0, z: -1}
     value: 5
     weight: 1
   - normal: {x: 1, y: 0, z: 0}
-    value: 3
+    value: 1
     weight: 1
   - normal: {x: -1, y: 0, z: 0}
     value: 4

@@ -29,13 +29,15 @@ The Unity Test Framework package is installed (`com.unity.test-framework 1.7.0`)
 
 ```
 LevelClickHandler (mouse click at roll plane)
-  → DiceManager.RollDie(worldTarget)
-      → Instantiate Die prefab (DieController + DiePipBuilder)
+  → DiceManager.RollDie(worldTarget)       // uses _diePrefabs[_activeDieIndex]
+      → Instantiate Die prefab (DieController on a UV-mapped FBX mesh)
       → DieController.Roll()
+          → PickWeightedFaceIndex()         // weighted random from DieFace list
           → DiceManager.GetSettledDicePoses()     // static obstacles
           → DiceManager.GetRollingDiceStates()    // kinematic obstacles (in-flight dice)
           → DieSimulator.Run()                    // two-pass simulation
-          → DieFaceMapper.PipRemapRotation()      // lock pip face BEFORE playback starts
+          → Compute Q = FromToRotation(desiredNormal, simTopNormal)
+          → Pre-multiply Q into ALL trajectory rotations (correctedRotations[])
           → PlaybackTrajectory coroutine          // WaitForFixedUpdate per step
           → OnRollComplete.Invoke(value)
 ```
@@ -46,12 +48,12 @@ LevelClickHandler (mouse click at roll plane)
 |---|---|
 | `Assets/Scripts/Dice/DiceSettings.cs` | `ScriptableObject` — single source of truth for all tuning (launch speed, physics, settle thresholds). Asset lives at `Assets/Settings/Dice/DiceSettings.asset`. |
 | `Assets/Scripts/Room/Room.cs` | `MonoBehaviour` on the Room prefab root. Stores `_width`, `_depth`, `_wallHeight`. `GetBounds()` returns the play-area `Bounds` consumed by `DiceManager` and `DieSimulator`. Changing any dimension field in the Inspector immediately reshapes all child geometry via `OnValidate`. |
-| `DiceManager.cs` | Singleton orchestrator. Tracks `List<DieController>` in roll order; supplies obstacle data to the simulator. Finds the active `Room` in `Start()` to provide bounds. |
-| `DieController.cs` | Per-die behaviour. Holds the recorded trajectory arrays (`WorldPositions[]`, `SimRotations[]`). Rigidbody is always kinematic. When `DieSimulator.Run()` returns `success=false`, `sim.positions` is null — code uses `?? System.Array.Empty<Vector3>()` to avoid a NullReferenceException. |
+| `DiceManager.cs` | Singleton orchestrator. Holds `_diePrefabs[10]` — one prefab per digit key (slot 0 = key 1, slot 9 = key 0). Pressing 1–0 calls `TrySetActive()` which only switches when the slot is filled. `RollDie()` instantiates `_diePrefabs[_activeDieIndex]`. Tracks `List<DieController>` in roll order; supplies obstacle data to the simulator. |
+| `DieController.cs` | Per-die behaviour. Holds `List<DieFace> _faces` (per-prefab face layout). On `Roll()`: picks a face by weighted random, computes correction quaternion Q, pre-multiplies Q into every trajectory rotation step so the die tumbles through the corrected arc from frame 1. `SimRotations` kept original for obstacle tracking; only `correctedRotations` is used for visual playback. |
+| `DieFace.cs` | Serializable struct: `Vector3 normal` (local-space), `int value`, `float weight`. Stored as `List<DieFace>` on each `DieController` prefab. Supports any number of faces and duplicate values (e.g. three 1s). `DefaultD6Faces()` provides the Western standard as a fallback. |
 | `LevelClickHandler.cs` | Converts mouse clicks to world targets. Uses `Physics.Raycast` (not `Plane.Raycast`) against all layers except Dice so wall clicks project correctly to the roll plane. Clamps the target using `Mathf.Max(halfDiag, wallInsetMargin)` — this is critical: when `dieSize` is small, `halfDiag < wallInsetMargin`, and clamping only by `halfDiag` would produce targets that always fail the sim's in-bounds check. |
 | `DieSimulator.cs` | Static class. Owns a persistent `LocalPhysicsMode.Physics3D` scene (`__DiceSimulation`). Runs up to `maxSimAttempts` random attempts (Pass 1), then re-runs the winner with all other dice as collider proxies (Pass 2). `SimResult.positions` is **null** when all attempts fail — callers must null-check. |
-| `DieFaceMapper.cs` | Static class. Encodes the Western die convention (+Y=1, -Y=6, +Z=2, -Z=5, +X=3, -X=4). Computes a `PipRoot` rotation offset so the die always shows the desired value regardless of where the sim landed. |
-| `DiePipBuilder.cs` | Procedurally builds pip sphere geometry under a `PipRoot` child. Pips are visual only — `SphereCollider` is destroyed immediately after creation. |
+| `DieFaceMapper.cs` | Static utility (no longer called by DieController). Kept as a reference for the Western d6 convention. |
 | `FrontWallGate.cs` | One-way passthrough for walls or ceiling. Solid collider starts disabled; a trigger zone opens it while dice are crossing, then closes once they're through. Configure `_outwardDir` to point away from the room interior: `(0,0,-1)` for front wall, `(0,1,0)` for ceiling. Trigger size is computed in world space via `lossyScale`, so it works correctly on scaled Cubes. |
 
 ## Architecture: Dice Rendering
@@ -124,11 +126,60 @@ Ceiling      = (0,  rollHeight + wallHeight,   0)    scale = (width, 0.1,       
 
 ### Face locking (important non-obvious behaviour)
 
-The `PipRoot` rotation offset is applied **before** the playback coroutine starts. The die mesh rotates freely during playback, but the pips are counter-rotated relative to the die body so the correct value faces up at the end. Editing `DieFaceMapper` or `DieController.Roll()` must preserve this ordering.
+Dice use UV-mapped FBX meshes — there are no procedural pips. Face locking is done by rotating the entire die body so the desired face is on top at the end of the sim.
+
+`DieController.Roll()` computes `Q = Quaternion.FromToRotation(desiredNormal, simTopNormal)` and then **pre-multiplies Q into every rotation in the trajectory array** before playback starts:
+
+```csharp
+for (int k = 0; k < simRotations.Length; k++)
+    correctedRotations[k] = simRotations[k] * Q;
+transform.rotation = sim.startRotation * Q;  // corrected start rotation
+```
+
+This is critical: applying Q only to the final frame causes a visible snap at landing. Pre-multiplying into all steps makes the die tumble through the corrected arc from frame 1, with no discontinuity. `SimRotations` are kept at their original (uncorrected) values so kinematic obstacle proxies in Pass 2 use the true physics arc.
+
+**`BestNormalForValue()`**: when a die has duplicate-value faces (e.g. three 1s), picks the face whose local normal is closest to `simTopNormal`. This minimises the magnitude of Q, making the trajectory look as natural as possible.
 
 ### Settle detection
 
 A sim step is considered settled only when **both** velocity conditions are met **and** a face is within `settleAlignThreshold` degrees of horizontal (`IsFaceAligned()`). The alignment check prevents the sim from treating a die balanced on an edge as settled.
+
+## Architecture: Die Configuration
+
+All per-die configuration lives on the prefab — no ScriptableObjects for individual dice. This means each die type is self-contained and adding a new die type is purely additive (duplicate a prefab, swap the mesh/material, edit the face layout in Inspector).
+
+### DieFace struct (`DieFace.cs`)
+
+```csharp
+[System.Serializable]
+public struct DieFace
+{
+    public Vector3 normal;   // local-space face normal (axis-aligned for d6)
+    public int     value;    // damage value when this face lands on top
+    [Min(0f)]
+    public float   weight;   // relative probability (0 = never, 2 = twice as likely)
+}
+```
+
+`DieController._faces` is a `List<DieFace>` serialized on the prefab. It supports any number of faces and duplicate values. If left empty at runtime, `DefaultD6Faces()` fills in the Western d6 standard (`+Y=1, –Y=6, +Z=2, –Z=5, +X=3, –X=4`).
+
+**Important — current die models use a non-standard +Z/–Z convention**: both `Die.prefab` and `Die_d6_111456.prefab` are built in Blender with `+Z=5, –Z=2` (opposite of the Western default). The face layouts stored on those prefabs already reflect this. If you add a new model built the same way in Blender, swap the +Z and –Z values in its face layout.
+
+### Die selection (keys 1–0)
+
+`DiceManager._diePrefabs` is a 10-element array. Slot 0 = key 1, slot 9 = key 0. Pressing a digit key calls `TrySetActive(index)`, which only switches when the slot is non-null. Currently:
+- Key 1 → `Die.prefab` (standard d6, values 1–6)
+- Key 2 → `Die_d6_111456.prefab` (three 1s, 4, 5, 6)
+
+### Standalone materials
+
+Die materials must be **standalone `.mat` files**, not the embedded materials inside the FBX. Embedded FBX materials lose their texture reference whenever the FBX is reimported (the binary bakes the old texture path). Standalone `.mat` files are immune.
+
+Current materials:
+- `Assets/Materials/Dice/Die_White.mat` — texture `Textures/Dice/Texture_Die_White.jpg`
+- `Assets/Materials/Dice/Die_White_No_111456.mat` — texture `Textures/Dice/Texture_Die_White_No_111456.jpg`
+
+When adding a new die: create a new `.mat` by duplicating an existing one, assign the correct texture, and assign that `.mat` to the new prefab's `MeshRenderer`. Do **not** use the FBX's embedded material directly.
 
 ## Architecture: Player
 
