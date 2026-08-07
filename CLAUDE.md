@@ -175,9 +175,9 @@ public struct DieFace
 
 Die materials must be **standalone `.mat` files**, not the embedded materials inside the FBX. Embedded FBX materials lose their texture reference whenever the FBX is reimported (the binary bakes the old texture path). Standalone `.mat` files are immune.
 
-Current materials:
-- `Assets/Materials/Dice/Die_White.mat` — texture `Textures/Dice/Texture_Die_White.jpg`
-- `Assets/Materials/Dice/Die_White_No_111456.mat` — texture `Textures/Dice/Texture_Die_White_No_111456.jpg`
+Current materials (note: art assets moved under `Assets/Art/` in the last reorganization):
+- `Assets/Art/Materials/Dice/Die_White.mat` — texture `Assets/Art/Textures/Dice/Texture_Die_White.jpg`
+- `Assets/Art/Materials/Dice/Die_White_No_111456.mat` — texture `Assets/Art/Textures/Dice/Texture_Die_White_No_111456.jpg`
 
 When adding a new die: create a new `.mat` by duplicating an existing one, assign the correct texture, and assign that `.mat` to the new prefab's `MeshRenderer`. Do **not** use the FBX's embedded material directly.
 
