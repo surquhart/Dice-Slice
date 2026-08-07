@@ -249,3 +249,51 @@ The dash is a state machine with four phases driven by coroutine timing and `Fix
 **Scaling** (multiplicative): `value = base × (1 + damage × multiplier)`, capped per element.
 
 **Screen shake** (`CameraShake.cs`): attached to Main Camera. Applies a decaying random XZ offset only (no Y). Scaled with damage, capped.
+
+**Entity hit detection** (inside `DashRoutine`): each physics step during Moving calls `Physics.OverlapBox` on the Entity layer (trigger interaction enabled). For each entity not already in `_hitEntitiesThisDash`, `TakeDamage(damage, dashDir)` is called, then the entity is added to the set. If the entity is impassable and still alive after the hit, `InterruptDash(prevStep)` is called immediately; `StopCoroutine` stops the coroutine at the next `yield return`, so the final `_rb.MovePosition(dashEnd)` never executes. `_hitEntitiesThisDash` is cleared at the start of every new dash so knockback-induced re-overlaps never deal double damage.
+
+## Architecture: Damageable Entities
+
+Everything the player can damage — enemies, traps, destructible objects — shares a single base class. The system is path-based: a hit occurs when the player pawn physically crosses an entity's collider space while moving toward a die. Entities are never targeted directly.
+
+### Key files
+
+| File | Role |
+|---|---|
+| `Assets/Scripts/Entities/DamageableEntity.cs` | Base `MonoBehaviour` with HP, HP bar, knockback, push-out, loot, and death. Implements `IDamageable`. |
+| `Assets/Scripts/Entities/IDamageable.cs` | Thin interface (`TakeDamage`, `IsAlive`, `IsImpassable`) used by `PlayerController` so entity types don't need to be imported there. |
+| `Assets/Scripts/Entities/IMovementBehavior.cs` | `Initialize(owner)` + `Move(deltaTime)` — drop on a prefab to give it a movement pattern. |
+| `Assets/Scripts/Entities/IAttackBehavior.cs` | `Initialize(owner)` + `Attack()` — drop on a prefab to give it an attack pattern. |
+| `Assets/Scripts/Entities/Enemy.cs` | Thin subclass. Only adds `_compendiumData` (ScriptableObject for display name/lore). |
+| `Assets/Scripts/Entities/LootEntry.cs` | Serializable struct: `GameObject prefab` + `float weight`. Stored as `List<LootEntry>` on each entity. |
+| `Assets/Scripts/Settings/EntitySettings.cs` | ScriptableObject for global tuning. Asset at `Assets/Settings/EntitySettings.asset`. |
+| `Assets/Prefabs/Entities/TrainingDummy.prefab` | First test entity. Plain `DamageableEntity`, MaxHP=10, no movement, no attacks, no loot. |
+
+### Layers
+
+- `Dice` (layer 8) — dice, player sprite child, HP bar slices, dash feedback (overlay camera).
+- `Player` (layer 9) — player root.
+- `Entity` (layer 10) — entity root GameObjects (solid collider + auto-generated trigger collider).
+
+### DamageableEntity
+
+`[RequireComponent(typeof(BoxCollider))]`. The first `BoxCollider` on the GameObject is the **solid** collider. `Awake()` auto-generates a second, slightly larger `BoxCollider` as a **trigger** — the player's OverlapBox query hits this trigger to detect a hit. Both colliders sit on the Entity layer.
+
+**HP bar**: two `PrimitiveType.Cube` child objects (grey background, red foreground) created at runtime, NOT parented to the entity — they follow it in `LateUpdate`. Both are on the Dice layer for overlay rendering. The foreground is left-anchor–filled: `fg.localPosition.x = (fill - 1f) * barWidth * 0.5f`. Visibility threshold: `_hpBarShowThreshold < 0` = never; `== 0` = show when HP < MaxHP; `> 0` = show when HP ≤ threshold.
+
+**Knockback**: coroutine moves `transform.position` in the dash direction + up to `knockbackJitter` degrees angular jitter, over `knockbackDuration` seconds (SmoothStep). Clamps to room bounds via `DiceManager.GetBoxBounds()`. Suppressed while the coroutine is active (`_isKnockingBack`).
+
+**Push-out**: `FixedUpdate` checks if the player center is inside the trigger bounds when `!player.IsDashing`. If so, pushes the player in the shortest-exit direction at `EntitySettings.pushOutSpeed`. If the push target is outside room bounds, the entity is pushed opposite instead. The player is moved via `PlayerController.PushTo(Vector3)` which sets `_rb.position` directly.
+
+**Death**: `StopAllCoroutines()`, optional death VFX instantiation, loot roll (weighted random from `_lootTable`), then `DeathSequence` coroutine that flashes all renderers white (`_deathFlashDuration` seconds, 0 = instant) before `Destroy(gameObject)`. HP bar is destroyed before the death sequence.
+
+**Armor hook**: `TakeDamage` calls `virtual int ProcessDamage(int raw)` before subtracting HP. Default implementation returns raw; override to reduce, block, or redirect damage.
+
+### Adding a new entity type
+
+1. Create a prefab under `Assets/Prefabs/Entities/`.
+2. Set root layer to `Entity`.
+3. Add one `BoxCollider` (solid, sized to match the art).
+4. Add `DamageableEntity` (or a subclass). Assign `EntitySettings` asset.
+5. Add a flat cube child for the sprite (scale Y ≈ 0.01), assign it to the `Dice` layer.
+6. Optionally drop `IMovementBehavior` / `IAttackBehavior` components on the same root.

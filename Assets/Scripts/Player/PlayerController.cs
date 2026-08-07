@@ -133,6 +133,12 @@ public class PlayerController : MonoBehaviour
     // IsDashing is true only during Delay + Moving; other systems gate on this.
     public bool IsDashing => _dashPhase == DashPhase.Delaying || _dashPhase == DashPhase.Moving;
 
+    // Exposed so DamageableEntity can compute push-out relative to the player's collider center.
+    public Vector3 ColliderCenter => _col.center;
+
+    // Called by entities to push the player out of their space during non-dash physics steps.
+    public void PushTo(Vector3 worldPosition) => _rb.position = worldPosition;
+
     Rigidbody   _rb;
     BoxCollider _col;
     Vector3     _velocity;
@@ -145,6 +151,9 @@ public class PlayerController : MonoBehaviour
 
     // Active feedback objects — lifetime reset when a chain occurs.
     readonly List<DashFeedback> _activeFeedback = new();
+
+    // Tracks which entities were hit this dash to prevent double-damage from knockback re-overlap.
+    readonly HashSet<DamageableEntity> _hitEntitiesThisDash = new();
 
     CameraShake _cameraShake;
 
@@ -241,6 +250,7 @@ public class PlayerController : MonoBehaviour
         var target = DiceManager.Instance.GetOldestActiveDie(_rb.position);
         if (target == null) return;
 
+        _hitEntitiesThisDash.Clear();
         if (_dashRoutine != null) StopCoroutine(_dashRoutine);
         _dashRoutine = StartCoroutine(DashRoutine(target));
     }
@@ -287,18 +297,43 @@ public class PlayerController : MonoBehaviour
         _dashPhase = DashPhase.Moving;
 
         // ── Movement ───────────────────────────────────────────────────────────
+        int     entityMask      = LayerMask.GetMask("Entity");
+        bool    dashInterrupted = false;
+        Vector3 prevStep        = dashStart;
+
         if (_dashDuration > 0f)
         {
             float elapsed = 0f;
-            while (elapsed < _dashDuration)
+            while (elapsed < _dashDuration && !dashInterrupted)
             {
-                float t = elapsed / _dashDuration;
-                _rb.MovePosition(Vector3.Lerp(dashStart, dashEnd, t));
+                float   t       = elapsed / _dashDuration;
+                Vector3 stepPos = Vector3.Lerp(dashStart, dashEnd, t);
+                _rb.MovePosition(stepPos);
+
+                var hits = Physics.OverlapBox(stepPos + _col.center, _col.size * 0.5f,
+                    Quaternion.identity, entityMask, QueryTriggerInteraction.Collide);
+                foreach (var hitCol in hits)
+                {
+                    var de = hitCol.GetComponentInParent<DamageableEntity>();
+                    if (de == null || _hitEntitiesThisDash.Contains(de)) continue;
+                    _hitEntitiesThisDash.Add(de);
+                    de.TakeDamage(damage, dashDir);
+                    if (de.IsImpassable && de.IsAlive)
+                    {
+                        InterruptDash(prevStep);
+                        dashInterrupted = true;
+                        break;
+                    }
+                }
+
+                prevStep = stepPos;
                 elapsed += Time.fixedDeltaTime;
                 yield return new WaitForFixedUpdate();
             }
         }
-        _rb.MovePosition(dashEnd);
+
+        if (!dashInterrupted)
+            _rb.MovePosition(dashEnd);
 
         // ── Post-dash velocity ─────────────────────────────────────────────────
         _velocity  = _retainVelocity ? preDashVelocity : Vector3.zero;
