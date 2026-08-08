@@ -53,8 +53,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.6, y: 0.1, z: 0.6}
-  m_Center: {x: 0, y: 0.05, z: 0}
+  m_Size: {x: 0.6, y: 0.1, z: 0.9}
+  m_Center: {x: 0, y: 0.05, z: -0.05}
 --- !u!114 &8743086793211400985
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -67,7 +67,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 49f0d03585be4314987d546c5dff6e69, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DamageableEntity
-  _maxHP: 10
+  _maxHP: 50
   _hpBarShowThreshold: 0
   _hpBarSizeOverride: 0
   _isImpassable: 0
@@ -75,7 +75,7 @@ MonoBehaviour:
   _knockbackMultiplier: 1
   _knockbackJitterOverride: -1
   _deathVfxPrefab: {fileID: 0}
-  _deathFlashDuration: 0.12
+  _deathFlashDuration: 0.5
   _lootTable: []
   _settings: {fileID: 11400000, guid: bd71af464573fa247a29a76d7b9d163c, type: 2}
 --- !u!1 &4365612597974085472
@@ -89,6 +89,7 @@ GameObject:
   - component: {fileID: 8488793937534229031}
   - component: {fileID: 4619800531694038871}
   - component: {fileID: 6884248954687560839}
+  - component: {fileID: 3875924586957609825}
   m_Layer: 8
   m_Name: Sprite
   m_TagString: Untagged
@@ -105,7 +106,7 @@ Transform:
   m_GameObject: {fileID: 4365612597974085472}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.05, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 0.6, y: 0.01, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -168,3 +169,17 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &3875924586957609825
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4365612597974085472}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7ce4514e696869048ad4f7f55863c516, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DepthSorter
+  _sortingBaseWorldY: 0.05
+  _sortingScale: 0.05

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EntitySettings
   pushOutSpeed: 10
   pushOutColliderExpand: 0.05
-  knockbackDistance: 1.5
+  knockbackDistance: 0
   knockbackDuration: 0.12
   knockbackJitter: 12
   hpBarZOffset: 0.7

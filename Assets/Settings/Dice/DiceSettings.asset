@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: DiceSettings
   m_EditorClassIdentifier: Assembly-CSharp::DiceSettings
   dieSize: 0.66
-  rollHeight: 2.99
+  rollHeight: 0
   rollHeightJitter: 0.2
   launchSpeed: 8
   launchSpeedMargin: 1.5
@@ -33,3 +33,10 @@ MonoBehaviour:
   dieMaxAngularVel: 50
   dieBounce: {fileID: 0}
   wallBounce: {fileID: 0}
+  dieRemovalDelay: 0.2
+  rollingStartOpacity: 0.25
+  playbackSpeedMultiplier: 1
+  dustCloudEarlyFrames: 5
+  dustCloudMaxRadius: 1
+  dustCloudExpandDuration: 0.3
+  dustCloudFadeDuration: 0.2

@@ -50,11 +50,14 @@ public class PlayerController : MonoBehaviour
 
     // ── Dash — Line ────────────────────────────────────────────────────────────
     [Header("Dash — Line")]
-    [Tooltip("Colour of the debug line drawn for a completed dash.")]
-    [SerializeField] Color _lineColor          = new Color(0.55f, 0.55f, 0.55f, 1f);
+    [Tooltip("Colour of the grey line segment (before hit point, or the entire line if no hit occurs).")]
+    [SerializeField] Color _lineColor                  = new Color(0.55f, 0.55f, 0.55f, 1f);
 
-    [Tooltip("Colour of the line when the dash is interrupted.")]
-    [SerializeField] Color _interruptLineColor = new Color(0.78f, 0.78f, 0.78f, 1f);
+    [Tooltip("Colour of the line segment after a hit point when the dash completes without interrupt.")]
+    [SerializeField] Color _hitLineColor               = new Color(0.85f, 0.1f,  0.1f,  1f);
+
+    [Tooltip("Colour of the line when the dash is interrupted with no damage dealt.")]
+    [SerializeField] Color _interruptNoDamageLineColor = new Color(0.72f, 0.72f, 0.72f, 1f);
 
     [Tooltip("Base width of the dash line in world units. LineRenderer default is 0.1.")]
     [SerializeField] float _lineBaseWidth      = 0.1f;
@@ -73,11 +76,14 @@ public class PlayerController : MonoBehaviour
 
     // ── Dash — Number ──────────────────────────────────────────────────────────
     [Header("Dash — Number")]
-    [Tooltip("Colour of the damage number. Should be noticeably darker than the line colour for readability.")]
-    [SerializeField] Color _numberColor          = new Color(0.30f, 0.30f, 0.30f, 1f);
+    [Tooltip("Colour of the damage number when no hit occurs (grey midpoint).")]
+    [SerializeField] Color _numberColor                  = new Color(0.30f, 0.30f, 0.30f, 1f);
 
-    [Tooltip("Colour of the damage number when the dash is interrupted.")]
-    [SerializeField] Color _interruptNumberColor = new Color(0.62f, 0.62f, 0.62f, 1f);
+    [Tooltip("Colour of the damage number at hit locations.")]
+    [SerializeField] Color _hitNumberColor               = new Color(0.85f, 0.1f,  0.1f,  1f);
+
+    [Tooltip("Colour of the damage number when the dash is interrupted with no damage dealt.")]
+    [SerializeField] Color _interruptNoDamageNumberColor = new Color(0.60f, 0.60f, 0.60f, 1f);
 
     [Tooltip("Base world-space scale of the damage number. At 1, the number is approximately 1 unit tall along the floor (depth axis).")]
     [SerializeField] float _numberBaseSize       = 1f;
@@ -120,18 +126,48 @@ public class PlayerController : MonoBehaviour
     [Tooltip("Maximum camera shake magnitude on the Z axis regardless of damage.")]
     [SerializeField] float _shakeCapZ           = 0.3f;
 
+    [Tooltip("Camera shake magnitude on the X axis each time the dash connects with an entity.")]
+    [SerializeField] float _hitShakeX        = 0.03f;
+
+    [Tooltip("Camera shake magnitude on the Z axis each time the dash connects with an entity.")]
+    [SerializeField] float _hitShakeZ        = 0.03f;
+
+    [Tooltip("Duration in seconds of the camera shake triggered by each hit.")]
+    [SerializeField] float _hitShakeDuration = 0.12f;
+
+    [Tooltip("Camera shake magnitude on the X axis when a dash is interrupted by an impassable entity.")]
+    [SerializeField] float _interruptShakeX        = 0.08f;
+
+    [Tooltip("Camera shake magnitude on the Z axis when a dash is interrupted by an impassable entity.")]
+    [SerializeField] float _interruptShakeZ        = 0.08f;
+
+    [Tooltip("Duration in seconds of the camera shake triggered by an interrupt.")]
+    [SerializeField] float _interruptShakeDuration = 0.20f;
+
     // ── Dash — Interrupt ───────────────────────────────────────────────────────
     [Header("Dash — Interrupt")]
-    [Tooltip("Scale applied to both the line width and number size when a dash is interrupted (e.g., 0.5 = half size).")]
-    [SerializeField] float _interruptShrink = 0.5f;
+    [Tooltip("Size multiplier for the midpoint number when interrupted with no damage dealt (e.g., 0.5 = half size). Number is NOT damage-scaled.")]
+    [SerializeField] float _interruptNoDamageSizeMult = 0.5f;
+
+    [Tooltip("World-unit XZ offset applied to a hit number when damage is 0 (furthest from entity). Keeps small numbers visible.")]
+    [SerializeField] float _numberHitMaxOffset = 1.0f;
+
+    [Tooltip("World-unit XZ offset applied to a hit number when damage * Damage Scale Mult = Size Cap (closest to entity, number is large enough to read).")]
+    [SerializeField] float _numberHitMinOffset = 0.2f;
+
+    [Tooltip("Distance in world units the player rebounds when a dash is interrupted by an impassable entity.")]
+    [SerializeField] float _reboundDistance = 0.35f;
+
+    [Tooltip("Duration in seconds of the rebound animation after an interrupted dash.")]
+    [SerializeField] float _reboundDuration = 0.10f;
 
     // ── Runtime ────────────────────────────────────────────────────────────────
 
-    enum DashPhase { None, Delaying, Moving, PostDash }
+    enum DashPhase { None, Delaying, Moving, PostDash, Rebounding }
     DashPhase _dashPhase = DashPhase.None;
 
-    // IsDashing is true only during Delay + Moving; other systems gate on this.
-    public bool IsDashing => _dashPhase == DashPhase.Delaying || _dashPhase == DashPhase.Moving;
+    // IsDashing is true during Delay, Moving, and Rebounding; other systems gate on this.
+    public bool IsDashing => _dashPhase == DashPhase.Delaying || _dashPhase == DashPhase.Moving || _dashPhase == DashPhase.Rebounding;
 
     // Exposed so DamageableEntity can compute push-out relative to the player's collider center.
     public Vector3 ColliderCenter => _col.center;
@@ -299,7 +335,7 @@ public class PlayerController : MonoBehaviour
         // ── Movement ───────────────────────────────────────────────────────────
         int     entityMask      = LayerMask.GetMask("Entity");
         bool    dashInterrupted = false;
-        Vector3 prevStep        = dashStart;
+        Vector3 prevStepPos     = dashStart;
 
         if (_dashDuration > 0f)
         {
@@ -310,6 +346,42 @@ public class PlayerController : MonoBehaviour
                 Vector3 stepPos = Vector3.Lerp(dashStart, dashEnd, t);
                 _rb.MovePosition(stepPos);
 
+                // ── Sweep: BoxCast from prev position to catch entities skipped due to step size ──
+                Vector3 sweepVec  = stepPos - prevStepPos;
+                float   sweepDist = sweepVec.magnitude;
+                if (sweepDist > 0.001f)
+                {
+                    Vector3 sweepDir  = sweepVec / sweepDist;
+                    var sweepHits = Physics.BoxCastAll(
+                        prevStepPos + _col.center, _col.size * 0.5f,
+                        sweepDir, Quaternion.identity, sweepDist,
+                        entityMask, QueryTriggerInteraction.Collide);
+                    System.Array.Sort(sweepHits, (a, b) => a.distance.CompareTo(b.distance));
+
+                    foreach (var sh in sweepHits)
+                    {
+                        var de = sh.collider.GetComponentInParent<DamageableEntity>();
+                        if (de == null || _hitEntitiesThisDash.Contains(de)) continue;
+                        _hitEntitiesThisDash.Add(de);
+
+                        Vector3 contactPos = prevStepPos + sweepDir * sh.distance;
+                        feedback?.RecordHit(contactPos, damage, de.transform.position);
+                        de.TakeDamage(damage, dashDir);
+                        _cameraShake?.Shake(_hitShakeX, _hitShakeZ, _hitShakeDuration);
+
+                        if (de.IsImpassable && de.IsAlive)
+                        {
+                            feedback?.InterruptAt(contactPos, true, damage);
+                            InterruptDash(contactPos, damage);
+                            StartCoroutine(ReboundRoutine(contactPos, -dashDir));
+                            dashInterrupted = true;
+                            break;
+                        }
+                    }
+                    if (dashInterrupted) { prevStepPos = stepPos; break; }
+                }
+
+                // ── Overlap: detect entities at current position (first step or already inside) ──
                 var hits = Physics.OverlapBox(stepPos + _col.center, _col.size * 0.5f,
                     Quaternion.identity, entityMask, QueryTriggerInteraction.Collide);
                 foreach (var hitCol in hits)
@@ -317,45 +389,76 @@ public class PlayerController : MonoBehaviour
                     var de = hitCol.GetComponentInParent<DamageableEntity>();
                     if (de == null || _hitEntitiesThisDash.Contains(de)) continue;
                     _hitEntitiesThisDash.Add(de);
+
+                    feedback?.RecordHit(stepPos, damage, de.transform.position);
                     de.TakeDamage(damage, dashDir);
+                    _cameraShake?.Shake(_hitShakeX, _hitShakeZ, _hitShakeDuration);
+
                     if (de.IsImpassable && de.IsAlive)
                     {
-                        InterruptDash(prevStep);
+                        feedback?.InterruptAt(stepPos, true, damage);
+                        InterruptDash(stepPos, damage);
+                        StartCoroutine(ReboundRoutine(stepPos, -dashDir));
                         dashInterrupted = true;
                         break;
                     }
                 }
 
-                prevStep = stepPos;
+                prevStepPos = stepPos;
                 elapsed += Time.fixedDeltaTime;
                 yield return new WaitForFixedUpdate();
             }
         }
 
-        if (!dashInterrupted)
-            _rb.MovePosition(dashEnd);
-
-        // ── Post-dash velocity ─────────────────────────────────────────────────
-        _velocity  = _retainVelocity ? preDashVelocity : Vector3.zero;
-        _velocity += dashDir * _dashEndVelocity;
-
+        // ── Post-dash ──────────────────────────────────────────────────────────
         _lastDashEndTime     = Time.time;
         _lastDashTotalDamage = damage;
 
-        _dashPhase = DashPhase.PostDash;
-        yield return new WaitForSeconds(_postDashDelay);
-        _dashPhase = DashPhase.None;
+        if (!dashInterrupted)
+        {
+            _rb.MovePosition(dashEnd);
+            if (_hitEntitiesThisDash.Count == 0)
+                feedback?.FinalizeNoHit(damage);
+
+            _velocity  = _retainVelocity ? preDashVelocity : Vector3.zero;
+            _velocity += dashDir * _dashEndVelocity;
+
+            _dashPhase = DashPhase.PostDash;
+            yield return new WaitForSeconds(_postDashDelay);
+            _dashPhase = DashPhase.None;
+        }
+        else
+        {
+            yield return null; // let StopCoroutine take effect here
+        }
     }
 
     // Publicly interruptible — call this when the dash is blocked by a future hazard/enemy.
-    public void InterruptDash(Vector3 stopPos)
+    public void InterruptDash(Vector3 stopPos, int pendingDamage = 0)
     {
         if (_dashPhase != DashPhase.Moving) return;
         if (_dashRoutine != null) { StopCoroutine(_dashRoutine); _dashRoutine = null; }
         _rb.MovePosition(stopPos);
         _velocity  = Vector3.zero;
         _dashPhase = DashPhase.None;
-        foreach (var fb in _activeFeedback) fb?.Interrupt(stopPos);
+        foreach (var fb in _activeFeedback) fb?.InterruptAt(stopPos, false, pendingDamage);
+        _cameraShake?.Shake(_interruptShakeX, _interruptShakeZ, _interruptShakeDuration);
+    }
+
+    IEnumerator ReboundRoutine(Vector3 contactPos, Vector3 reboundDir)
+    {
+        _dashPhase    = DashPhase.Rebounding;
+        Vector3 end   = ClampToRoomBounds(contactPos + reboundDir * _reboundDistance);
+        float elapsed = 0f;
+        while (elapsed < _reboundDuration)
+        {
+            float t = Mathf.SmoothStep(0f, 1f, elapsed / _reboundDuration);
+            _rb.MovePosition(Vector3.Lerp(contactPos, end, t));
+            elapsed += Time.fixedDeltaTime;
+            yield return new WaitForFixedUpdate();
+        }
+        _rb.MovePosition(end);
+        _dashPhase = DashPhase.None;
     }
 
     // ── Visual helpers ─────────────────────────────────────────────────────────
@@ -390,25 +493,28 @@ public class PlayerController : MonoBehaviour
 
     DashFeedback.Config BuildFeedbackConfig() => new DashFeedback.Config
     {
-        lineColor           = _lineColor,
-        interruptLineColor  = _interruptLineColor,
-        lineBaseWidth       = _lineBaseWidth,
-        lineDamageWidthMult = _lineDamageWidthMult,
-        lineWidthCap        = _lineWidthCap,
-        lineLifetime        = _lineLifetime,
-        lineFadeDuration    = _lineFadeDuration,
+        lineColor                  = _lineColor,
+        hitLineColor               = _hitLineColor,
+        interruptNoDamageLineColor = _interruptNoDamageLineColor,
+        lineBaseWidth              = _lineBaseWidth,
+        lineDamageWidthMult        = _lineDamageWidthMult,
+        lineWidthCap               = _lineWidthCap,
+        lineLifetime               = _lineLifetime,
+        lineFadeDuration           = _lineFadeDuration,
 
-        numberColor           = _numberColor,
-        interruptNumberColor  = _interruptNumberColor,
-        numberBaseSize        = _numberBaseSize,
-        numberDamageScaleMult = _numberDamageScaleMult,
-        numberSizeCap         = _numberSizeCap,
-        numberLifetime             = _numberLifetime,
-        numberFadeDuration         = _numberFadeDuration,
-        numberLinePosition         = _numberLinePosition,
-        numberChainAlphaReduction  = _numberChainAlphaReduction,
-
-        interruptShrink = _interruptShrink,
+        numberColor                  = _numberColor,
+        hitNumberColor               = _hitNumberColor,
+        interruptNoDamageNumberColor = _interruptNoDamageNumberColor,
+        numberBaseSize               = _numberBaseSize,
+        numberDamageScaleMult        = _numberDamageScaleMult,
+        numberSizeCap                = _numberSizeCap,
+        interruptNoDamageSizeMult    = _interruptNoDamageSizeMult,
+        numberHitMaxOffset           = _numberHitMaxOffset,
+        numberHitMinOffset           = _numberHitMinOffset,
+        numberLifetime               = _numberLifetime,
+        numberFadeDuration           = _numberFadeDuration,
+        numberLinePosition           = _numberLinePosition,
+        numberChainAlphaReduction    = _numberChainAlphaReduction,
     };
 
     // ── Room clamping ──────────────────────────────────────────────────────────

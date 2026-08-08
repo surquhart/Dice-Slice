@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 838140286589331568}
   - component: {fileID: 2164351335998230349}
   - component: {fileID: 2384452719892263207}
+  - component: {fileID: 4819765350471985890}
   m_Layer: 8
   m_Name: Sprite
   m_TagString: Untagged
@@ -27,7 +28,7 @@ Transform:
   m_GameObject: {fileID: 423240507840047025}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.005, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 0.5, y: 0.01, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -90,6 +91,20 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &4819765350471985890
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 423240507840047025}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7ce4514e696869048ad4f7f55863c516, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DepthSorter
+  _sortingBaseWorldY: 0.05
+  _sortingScale: 0.05
 --- !u!1 &1156512407854777826
 GameObject:
   m_ObjectHideFlags: 0
@@ -198,14 +213,16 @@ MonoBehaviour:
   _dashEndVelocity: 3
   _chainWindow: 1
   _lineColor: {r: 0.55, g: 0.55, b: 0.55, a: 1}
-  _interruptLineColor: {r: 0.78, g: 0.78, b: 0.78, a: 1}
+  _hitLineColor: {r: 0.85, g: 0.1, b: 0.1, a: 1}
+  _interruptNoDamageLineColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
   _lineBaseWidth: 0.1
   _lineDamageWidthMult: 0.01
   _lineWidthCap: 0.5
   _lineLifetime: 0.8
   _lineFadeDuration: 0.5
   _numberColor: {r: 0.3, g: 0.3, b: 0.3, a: 1}
-  _interruptNumberColor: {r: 0.62, g: 0.62, b: 0.62, a: 1}
+  _hitNumberColor: {r: 0.85, g: 0.1, b: 0.1, a: 1}
+  _interruptNoDamageNumberColor: {r: 0.6, g: 0.6, b: 0.6, a: 1}
   _numberBaseSize: 0.3
   _numberDamageScaleMult: 0.1
   _numberSizeCap: 2.5
@@ -213,10 +230,20 @@ MonoBehaviour:
   _numberLifetime: 1
   _numberFadeDuration: 0.3
   _numberChainAlphaReduction: 0.2
-  _shakeBaseX: 0.05
-  _shakeBaseZ: 0.05
+  _shakeBaseX: 0.04
+  _shakeBaseZ: 0.04
   _shakeDamageMultX: 0.1
   _shakeDamageMultZ: 0.1
   _shakeCapX: 0.3
   _shakeCapZ: 0.3
-  _interruptShrink: 0.5
+  _hitShakeX: 0.3
+  _hitShakeZ: 0.3
+  _hitShakeDuration: 0.12
+  _interruptShakeX: 0.5
+  _interruptShakeZ: 0.5
+  _interruptShakeDuration: 0.3
+  _interruptNoDamageSizeMult: 0.5
+  _numberHitMaxOffset: 1
+  _numberHitMinOffset: 0.2
+  _reboundDistance: 0.75
+  _reboundDuration: 0.1
